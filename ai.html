@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Neural Pulse — AI Knowledge Quiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0B0E1A;
+    --bg-2:#0E1226;
+    --surface:#12162C;
+    --surface-2:#1B2040;
+    --border:#262C52;
+    --text:#E8E9F3;
+    --text-dim:#8B90B3;
+    --accent:#7C5CFF;
+    --accent-2:#22D3EE;
+    --success:#4ADE80;
+    --danger:#FB7185;
+    --warning:#FBBF24;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{height:100%;}
+  body{
+    background:
+      radial-gradient(ellipse 900px 500px at 15% -10%, rgba(124,92,255,0.20), transparent 60%),
+      radial-gradient(ellipse 700px 500px at 110% 10%, rgba(34,211,238,0.14), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    overflow-x:hidden;
+    position:relative;
+  }
+  .mono{ font-family:'JetBrains Mono', monospace; }
+  .display{ font-family:'Space Grotesk', sans-serif; }
+
+  /* ambient background wires */
+  #wires{ position:fixed; inset:0; z-index:0; opacity:0.35; pointer-events:none; }
+  #wires path{ stroke:url(#wireGrad); stroke-width:1; fill:none; }
+  #wires circle{ fill:var(--accent-2); }
+
+  #app{ position:relative; z-index:1; min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:32px 20px 60px; }
+
+  .eyebrow{
+    font-family:'JetBrains Mono', monospace;
+    letter-spacing:0.18em;
+    font-size:12px;
+    color:var(--accent-2);
+    text-transform:uppercase;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:14px;
+  }
+  .eyebrow .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent-2); box-shadow:0 0 8px var(--accent-2); animation:pulse-dot 1.6s infinite; }
+  @keyframes pulse-dot{ 0%,100%{opacity:1;} 50%{opacity:0.25;} }
+
+  .screen{ width:100%; max-width:760px; animation:screen-in 0.5s cubic-bezier(.2,.9,.25,1); }
+  @keyframes screen-in{ from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+
+  /* ---------- START SCREEN ---------- */
+  .hero{ text-align:center; padding:48px 12px 8px; }
+  .hero h1{
+    font-size:clamp(40px, 8vw, 64px);
+    font-weight:700;
+    letter-spacing:-0.02em;
+    line-height:1.02;
+    background:linear-gradient(120deg, #fff 20%, var(--accent-2) 55%, var(--accent) 90%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .hero p.sub{ color:var(--text-dim); margin-top:14px; font-size:16px; max-width:480px; margin-left:auto; margin-right:auto; }
+
+  .node-orbit{ position:relative; width:220px; height:220px; margin:36px auto; }
+  .node-orbit svg{ width:100%; height:100%; }
+  .node-orbit .core{ fill:var(--accent); filter:drop-shadow(0 0 18px var(--accent)); }
+  .node-orbit .ring{ fill:none; stroke:var(--border); stroke-width:1; }
+  .node-orbit .satellite{ fill:var(--accent-2); filter:drop-shadow(0 0 8px var(--accent-2)); }
+
+  .start-form{ display:flex; flex-direction:column; align-items:center; gap:16px; margin-top:12px; }
+  input#nameInput{
+    width:100%; max-width:360px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    font-size:16px;
+    padding:15px 18px;
+    border-radius:12px;
+    outline:none;
+    transition:border-color .2s, box-shadow .2s;
+    text-align:center;
+  }
+  input#nameInput::placeholder{ color:var(--text-dim); }
+  input#nameInput:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(124,92,255,0.15); }
+
+  .btn{
+    font-family:'Space Grotesk', sans-serif;
+    font-weight:600;
+    font-size:15px;
+    letter-spacing:0.01em;
+    border:none;
+    border-radius:12px;
+    padding:15px 28px;
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+    display:inline-flex; align-items:center; gap:8px;
+  }
+  .btn:active{ transform:scale(0.97); }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn-primary{ background:linear-gradient(120deg, var(--accent), #5B3FE0); color:#fff; box-shadow:0 8px 24px -8px rgba(124,92,255,0.6); }
+  .btn-primary:hover:not(:disabled){ box-shadow:0 10px 28px -6px rgba(124,92,255,0.75); transform:translateY(-1px); }
+  .btn-ghost{ background:var(--surface); color:var(--text); border:1px solid var(--border); }
+  .btn-ghost:hover{ border-color:var(--accent-2); color:var(--accent-2); }
+
+  .meta-row{ display:flex; gap:22px; justify-content:center; margin-top:30px; flex-wrap:wrap; }
+  .meta-item{ text-align:center; }
+  .meta-item .num{ font-family:'JetBrains Mono', monospace; font-size:20px; color:var(--accent-2); font-weight:700; }
+  .meta-item .lbl{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-top:2px; }
+
+  .nav-links{ display:flex; gap:10px; margin-top:36px; }
+
+  /* ---------- QUIZ SCREEN ---------- */
+  .quiz-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:18px; }
+  .qcount{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-dim); }
+  .qcount b{ color:var(--text); }
+  .score-pill{
+    font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
+    background:var(--surface); border:1px solid var(--border); color:var(--warning);
+    padding:6px 14px; border-radius:999px;
+  }
+  .top-right{ display:flex; align-items:center; gap:10px; }
+  .timer-pill{
+    font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
+    background:var(--surface); border:1px solid var(--border); color:var(--accent-2);
+    padding:6px 14px; border-radius:999px; display:flex; align-items:center; gap:6px;
+    transition:all .2s;
+  }
+  .timer-pill .tdot{ width:6px; height:6px; border-radius:50%; background:var(--accent-2); }
+  .timer-pill.low{ color:var(--danger); border-color:var(--danger); animation:timer-pulse 1s infinite; }
+  .timer-pill.low .tdot{ background:var(--danger); }
+  @keyframes timer-pulse{ 0%,100%{ box-shadow:0 0 0 0 rgba(251,113,133,0.5);} 50%{ box-shadow:0 0 0 6px rgba(251,113,133,0);} }
+
+  .diff-badge{
+    font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700; letter-spacing:0.08em;
+    text-transform:uppercase; padding:4px 10px; border-radius:999px; display:inline-block;
+    margin-left:10px; vertical-align:middle;
+  }
+  .diff-badge.easy{ background:rgba(74,222,128,0.12); color:var(--success); border:1px solid rgba(74,222,128,0.35); }
+  .diff-badge.average{ background:rgba(251,191,36,0.12); color:var(--warning); border:1px solid rgba(251,191,36,0.35); }
+  .diff-badge.hard{ background:rgba(251,113,133,0.12); color:var(--danger); border:1px solid rgba(251,113,133,0.35); }
+
+  .track{ display:flex; align-items:center; gap:2px; margin-bottom:28px; overflow-x:auto; padding:6px 2px; }
+  .track::-webkit-scrollbar{ display:none; }
+  .track-node{ width:9px; height:9px; border-radius:50%; background:var(--border); flex:0 0 auto; transition:all .3s; }
+  .track-line{ height:2px; width:10px; background:var(--border); flex:1 1 auto; min-width:6px; transition:all .3s; }
+  .track-node.done{ background:var(--success); box-shadow:0 0 8px var(--success); }
+  .track-node.wrong{ background:var(--danger); box-shadow:0 0 8px var(--danger); }
+  .track-node.current{ background:var(--accent-2); box-shadow:0 0 10px var(--accent-2); transform:scale(1.5); }
+  .track-line.done{ background:var(--success); }
+  .track-line.wrong{ background:var(--danger); }
+
+  .qcard{
+    background:linear-gradient(180deg, var(--surface), var(--surface-2));
+    border:1px solid var(--border);
+    border-radius:20px;
+    padding:34px 30px;
+  }
+  .qcard .tag{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--accent-2); text-transform:uppercase; letter-spacing:0.1em; }
+  .qcard h2{ font-family:'Space Grotesk', sans-serif; font-size:clamp(21px,4vw,27px); font-weight:600; margin-top:10px; line-height:1.3; }
+
+  .options{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:26px; }
+  @media (max-width:560px){ .options{ grid-template-columns:1fr; } }
+
+  .opt{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px 18px;
+    text-align:left;
+    cursor:pointer;
+    display:flex; align-items:center; gap:12px;
+    transition:all .18s ease;
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+  }
+  .opt .letter{
+    width:26px; height:26px; border-radius:8px; background:var(--surface-2); border:1px solid var(--border);
+    display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim); flex:0 0 auto;
+    transition:all .18s ease;
+  }
+  .opt:hover:not(.locked){ border-color:var(--accent); transform:translateY(-2px); box-shadow:0 8px 18px -10px rgba(124,92,255,0.5); }
+  .opt:hover:not(.locked) .letter{ border-color:var(--accent); color:var(--accent-2); }
+  .opt.locked{ cursor:default; }
+  .opt.correct{ border-color:var(--success); background:rgba(74,222,128,0.08); }
+  .opt.correct .letter{ background:var(--success); color:#062; border-color:var(--success); }
+  .opt.wrong{ border-color:var(--danger); background:rgba(251,113,133,0.08); }
+  .opt.wrong .letter{ background:var(--danger); color:#400; border-color:var(--danger); }
+  .opt.dim{ opacity:0.4; }
+
+  .feedback{ margin-top:20px; min-height:24px; font-family:'JetBrains Mono', monospace; font-size:13px; display:flex; align-items:center; gap:8px; }
+  .feedback.show-correct{ color:var(--success); }
+  .feedback.show-wrong{ color:var(--danger); }
+
+  .qcard, .options, .opt, #qText { user-select:none; -webkit-user-select:none; -moz-user-select:none; }
+
+  .cheat-banner{
+    background:rgba(251,113,133,0.1); border:1px solid var(--danger); color:var(--danger);
+    font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.5;
+    padding:12px 16px; border-radius:12px; margin-bottom:16px;
+    display:flex; align-items:flex-start; gap:10px;
+    animation:screen-in .3s ease;
+  }
+  .cheat-banner .icon{ flex:0 0 auto; font-size:16px; }
+
+  .integrity-box{
+    background:rgba(251,113,133,0.08); border:1px solid var(--danger); border-radius:16px;
+    padding:20px 22px; margin-top:22px; text-align:left;
+  }
+  .integrity-box h3{ font-family:'Space Grotesk', sans-serif; color:var(--danger); font-size:16px; margin-bottom:6px; }
+  .integrity-box p{ color:var(--text-dim); font-size:13px; line-height:1.6; }
+  .integrity-box ul{ margin-top:10px; padding-left:18px; color:var(--text-dim); font-size:12.5px; font-family:'JetBrains Mono', monospace; }
+
+  /* ---------- RESULT SCREEN ---------- */
+  .result-card{ text-align:center; padding:40px 20px; }
+  .score-big{ font-family:'Space Grotesk', sans-serif; font-weight:700; font-size:clamp(64px,16vw,110px); line-height:1; background:linear-gradient(120deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .score-of{ color:var(--text-dim); font-family:'JetBrains Mono', monospace; margin-top:4px; }
+  .grade{ font-family:'Space Grotesk', sans-serif; font-size:22px; font-weight:600; margin-top:18px; }
+  .grade-sub{ color:var(--text-dim); margin-top:8px; font-size:14px; max-width:420px; margin-left:auto; margin-right:auto; }
+
+  .stat-row{ display:flex; justify-content:center; gap:28px; margin-top:30px; flex-wrap:wrap; }
+  .stat{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px 22px; min-width:110px; }
+  .stat .v{ font-family:'JetBrains Mono', monospace; font-size:22px; font-weight:700; }
+  .stat .l{ font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-top:4px; }
+  .stat.v-success .v{ color:var(--success); }
+  .stat.v-danger .v{ color:var(--danger); }
+
+  .action-row{ display:flex; gap:12px; justify-content:center; margin-top:34px; flex-wrap:wrap; }
+
+  /* ---------- LEADERBOARD ---------- */
+  .lb-header{ text-align:center; margin-bottom:26px; }
+  .lb-header h2{ font-family:'Space Grotesk', sans-serif; font-size:28px; }
+  .lb-list{ display:flex; flex-direction:column; gap:10px; }
+  .lb-row{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:14px 18px; display:flex; align-items:center; gap:16px;
+    animation:screen-in .4s ease both;
+  }
+  .lb-row.me{ border-color:var(--accent-2); box-shadow:0 0 0 1px var(--accent-2) inset; }
+  .rank{ font-family:'JetBrains Mono', monospace; font-weight:700; font-size:16px; width:34px; text-align:center; color:var(--text-dim); }
+  .rank.r1{ color:#FFD166; font-size:19px; }
+  .rank.r2{ color:#C9CEDB; font-size:18px; }
+  .rank.r3{ color:#E0A868; font-size:17px; }
+  .lb-name{ flex:1; font-weight:600; font-family:'Space Grotesk', sans-serif; }
+  .lb-date{ font-size:11px; color:var(--text-dim); font-family:'JetBrains Mono', monospace; }
+  .lb-score{ font-family:'JetBrains Mono', monospace; font-weight:700; color:var(--accent-2); font-size:16px; }
+  .lb-empty{ text-align:center; color:var(--text-dim); padding:40px 0; font-family:'JetBrains Mono', monospace; font-size:13px; }
+  .lb-loading{ text-align:center; color:var(--text-dim); padding:40px 0; font-family:'JetBrains Mono', monospace; font-size:13px; }
+
+  .tabs{ display:flex; gap:8px; justify-content:center; margin-bottom:30px; }
+  .tab{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.05em; text-transform:uppercase;
+    background:transparent; border:1px solid var(--border); color:var(--text-dim);
+    padding:9px 16px; border-radius:999px; cursor:pointer; transition:all .15s;
+  }
+  .tab.active{ border-color:var(--accent-2); color:var(--accent-2); background:rgba(34,211,238,0.08); }
+
+  .hidden{ display:none !important; }
+
+  .footer-note{ text-align:center; color:var(--text-dim); font-size:12px; margin-top:40px; font-family:'JetBrains Mono', monospace; opacity:0.6; }
+
+  /* ---------- HOST ACTIVATION ---------- */
+  .waiting-box{
+    background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:22px 24px; margin-top:8px; text-align:center;
+  }
+  .waiting-box .wdot{
+    width:9px; height:9px; border-radius:50%; background:var(--warning); display:inline-block;
+    margin-right:8px; box-shadow:0 0 8px var(--warning); animation:pulse-dot 1.4s infinite;
+  }
+  .waiting-box.live .wdot{ background:var(--success); box-shadow:0 0 8px var(--success); }
+  .waiting-box p{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-dim); }
+  .waiting-box.live p{ color:var(--success); }
+
+  .host-panel{
+    position:fixed; top:18px; right:18px; z-index:50;
+    background:var(--surface-2); border:1px solid var(--accent); border-radius:14px;
+    padding:16px 18px; width:230px;
+    box-shadow:0 12px 30px -10px rgba(0,0,0,0.6);
+  }
+  .host-panel h4{ font-family:'Space Grotesk', sans-serif; font-size:13px; margin-bottom:10px; color:var(--accent-2); }
+  .host-panel input{
+    width:100%; background:var(--surface); border:1px solid var(--border); color:var(--text);
+    padding:9px 10px; border-radius:8px; font-family:'JetBrains Mono', monospace; font-size:12px;
+    outline:none; margin-bottom:8px;
+  }
+  .host-panel input:focus{ border-color:var(--accent); }
+  .host-panel .btn{ width:100%; justify-content:center; font-size:12.5px; padding:10px; }
+  .host-panel .status{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim); margin-top:8px; text-align:center; }
+  .host-panel .status.on{ color:var(--success); }
+  .host-panel .status.off{ color:var(--danger); }
+
+  ::selection{ background:var(--accent); color:#fff; }
+</style>
+</head>
+<body>
+
+<svg id="wires">
+  <defs>
+    <linearGradient id="wireGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C5CFF"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<div id="app">
+
+  <!-- START SCREEN -->
+  <div class="screen" id="screen-start">
+    <div class="hero">
+      <div class="eyebrow" style="justify-content:center;"><span class="dot"></span> 20 QUESTIONS · AI &amp; MACHINE LEARNING</div>
+      <h1 class="display">NEURAL<br/>PULSE</h1>
+      <p class="sub">Test how well you actually know artificial intelligence — from neural nets to the Turing Test. Answer 20 questions, earn points, climb the live leaderboard.</p>
+    </div>
+
+    <div class="node-orbit">
+      <svg viewBox="0 0 220 220">
+        <circle class="ring" cx="110" cy="110" r="95"></circle>
+        <circle class="ring" cx="110" cy="110" r="65"></circle>
+        <circle class="core" cx="110" cy="110" r="14"></circle>
+        <g id="satellites"></g>
+      </svg>
+    </div>
+
+    <div class="start-form">
+      <input id="nameInput" type="text" placeholder="Enter your name to begin" maxlength="24" autocomplete="off" />
+      <button class="btn btn-primary" id="startBtn" disabled>Start the quiz →</button>
+      <div class="waiting-box" id="waitingBox">
+        <p><span class="wdot"></span><span id="waitingText">Checking with the host…</span></p>
+      </div>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-item"><div class="num">20</div><div class="lbl">Questions</div></div>
+      <div class="meta-item"><div class="num">100</div><div class="lbl">Max points</div></div>
+      <div class="meta-item"><div class="num">20</div><div class="lbl">Minutes limit</div></div>
+    </div>
+
+    <div class="nav-links">
+      <button class="btn btn-ghost" id="viewLbFromStart">View leaderboard</button>
+    </div>
+  </div>
+
+  <!-- HOST CONTROLS (only visible with ?host=1 in the URL) -->
+  <div class="host-panel hidden" id="hostPanel">
+    <h4>⚙ Host Controls</h4>
+    <div id="hostLocked">
+      <input id="hostPasscode" type="password" placeholder="Enter host passcode" />
+      <button class="btn btn-primary" id="hostUnlockBtn">Unlock</button>
+    </div>
+    <div id="hostUnlocked" class="hidden">
+      <button class="btn btn-primary" id="hostToggleBtn">Activate quiz</button>
+      <div class="status" id="hostStatus">checking…</div>
+    </div>
+  </div>
+
+
+  <!-- QUIZ SCREEN -->
+  <div class="screen hidden" id="screen-quiz">
+    <div class="quiz-top">
+      <div class="qcount">QUESTION <b id="qNumNow">1</b> / 20</div>
+      <div class="top-right">
+        <div class="timer-pill" id="timerPill"><span class="tdot"></span><span id="timerText">20:00</span></div>
+        <div class="score-pill mono" id="livePoints">0 PTS</div>
+      </div>
+    </div>
+    <div class="track" id="track"></div>
+    <div class="cheat-banner hidden" id="cheatBanner">
+      <span class="icon">⚠</span>
+      <span id="cheatBannerText">Suspicious activity detected — this attempt will be voided.</span>
+    </div>
+
+    <div class="qcard">
+      <div class="tag" id="qTag">AI FUNDAMENTALS</div><span class="diff-badge" id="qDiff">EASY</span>
+      <h2 id="qText">Question text goes here</h2>
+      <div class="options" id="optionsWrap"></div>
+      <div class="feedback" id="feedback"></div>
+    </div>
+  </div>
+
+  <!-- RESULT SCREEN -->
+  <div class="screen hidden" id="screen-result">
+    <div class="result-card">
+      <div class="eyebrow" style="justify-content:center;"><span class="dot"></span> QUIZ COMPLETE</div>
+      <div class="score-big" id="finalScore">0</div>
+      <div class="score-of">out of 100 points</div>
+      <div class="grade display" id="gradeText"></div>
+      <div class="grade-sub" id="gradeSub"></div>
+
+      <div class="stat-row">
+        <div class="stat v-success"><div class="v" id="statCorrect">0</div><div class="l">Correct</div></div>
+        <div class="stat v-danger"><div class="v" id="statWrong">0</div><div class="l">Wrong</div></div>
+        <div class="stat"><div class="v" id="statAccuracy">0%</div><div class="l">Accuracy</div></div>
+      </div>
+
+      <div class="integrity-box hidden" id="integrityBox">
+        <h3>⚠ Integrity check failed</h3>
+        <p>Copying, right-clicking, switching tabs, or opening dev tools was detected during this attempt. All answers have been marked wrong and this score was not added to the leaderboard.</p>
+        <ul id="integrityReasons"></ul>
+      </div>
+
+      <div class="action-row">
+        <button class="btn btn-primary" id="viewLbFromResult">See rankings →</button>
+        <button class="btn btn-ghost" id="playAgainBtn">Play again</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEADERBOARD SCREEN -->
+  <div class="screen hidden" id="screen-leaderboard">
+    <div class="tabs">
+      <button class="tab" id="tabHome">Home</button>
+      <button class="tab active" id="tabLb">Leaderboard</button>
+    </div>
+    <div class="lb-header">
+      <h2 class="display">Global Rankings</h2>
+    </div>
+    <div class="lb-list" id="lbList">
+      <div class="lb-loading">Loading rankings…</div>
+    </div>
+    <div class="action-row">
+      <button class="btn btn-ghost" id="refreshLb">Refresh</button>
+      <button class="btn btn-primary" id="retakeFromLb">Take the quiz</button>
+    </div>
+  </div>
+
+  <div class="footer-note">Scores are stored and shared with everyone using this quiz.</div>
+</div>
+
+<script type="module">
+  // ============================================================
+  // FIREBASE SETUP — paste your project's config below.
+  // Get this from: Firebase Console → Project Settings → General
+  // → "Your apps" → SDK setup and configuration → Config
+  // ============================================================
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp,
+    doc, setDoc, getDoc, onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+const firebaseConfig = {
+  apiKey: "AIzaSyB2HQzIAzrrLuTMtnRtlKCuyKC79RRDd1c",
+  authDomain: "ai-powerd-ccb9e.firebaseapp.com",
+  projectId: "ai-powerd-ccb9e",
+  storageBucket: "ai-powerd-ccb9e.firebasestorage.app",
+  messagingSenderId: "211603785054",
+  appId: "1:211603785054:web:2a1d5172022edfc944bbcf",
+  measurementId: "G-SNZL79QH3K"
+};
+
+  // Change this to your own passcode — anyone who enters it in the
+  // Host Controls panel (opened with ?host=1 in the URL) can activate
+  // or deactivate the quiz for everyone.
+  const HOST_PASSCODE = "letmehost";
+
+  const firebaseApp = initializeApp(firebaseConfig);
+  const db = getFirestore(firebaseApp);
+  const scoresCol = collection(db, "scores");
+  const settingsDocRef = doc(db, "settings", "quiz");
+  // ============================================================
+
+(function(){
+  // ---------------- QUESTION BANK ----------------
+  const QUESTIONS = [
+    { tag:"Fundamentals", diff:"easy", q:"What does the acronym \"AI\" stand for?", opts:["Automated Interface","Artificial Intelligence","Applied Informatics","Algorithmic Iteration"], correct:1 },
+    { tag:"Neural Networks", diff:"easy", q:"Neural networks are loosely inspired by which biological system?", opts:["The human brain","The circulatory system","The immune system","The digestive system"], correct:0 },
+    { tag:"Products", diff:"easy", q:"Which company created ChatGPT?", opts:["Google","Meta","OpenAI","Amazon"], correct:2 },
+    { tag:"Fundamentals", diff:"easy", q:"What does \"ML\" stand for?", opts:["Meta Learning","Machine Learning","Modular Logic","Mapped Layers"], correct:1 },
+    { tag:"Fundamentals", diff:"easy", q:"What does \"NLP\" stand for?", opts:["Neural Layer Processing","Natural Language Processing","Node Level Parsing","Numeric Language Prediction"], correct:1 },
+    { tag:"Applications", diff:"easy", q:"A program designed to simulate conversation with a human is called a:", opts:["Chatbot","Crawler","Compiler","Codec"], correct:0 },
+    { tag:"Applications", diff:"easy", q:"\"Computer vision\" refers to AI systems that primarily work with:", opts:["Audio signals","Images and video","Spreadsheets","Network traffic"], correct:1 },
+    { tag:"Fundamentals", diff:"easy", q:"What does \"AGI\" stand for?", opts:["Advanced Graphics Interface","Artificial General Intelligence","Automated Global Index","Applied Generative Inference"], correct:1 },
+    { tag:"Learning Types", diff:"average", q:"Which learning approach trains a model using labeled data?", opts:["Reinforcement learning","Unsupervised learning","Supervised learning","Federated learning"], correct:2 },
+    { tag:"Core Concepts", diff:"average", q:"\"Overfitting\" describes a model that:", opts:["Trains too slowly","Performs well on training data but poorly on new data","Uses too little data","Runs only on GPUs"], correct:1 },
+    { tag:"Algorithms", diff:"average", q:"Which algorithm makes predictions using a branching, if/else-like structure?", opts:["Decision Tree","K-Means","Transformer","Gradient Descent"], correct:0 },
+    { tag:"Products", diff:"average", q:"Which company developed AlphaGo, the AI that beat top Go players?", opts:["OpenAI","DeepMind","IBM","Nvidia"], correct:1 },
+    { tag:"Learning Types", diff:"average", q:"Reinforcement learning trains an agent primarily using:", opts:["Labeled datasets","Rewards and penalties","Pixel clustering","Randomized weights"], correct:1 },
+    { tag:"Learning Types", diff:"average", q:"Which of these is an unsupervised learning technique?", opts:["Clustering","Classification","Regression","Backpropagation"], correct:0 },
+    { tag:"Architecture", diff:"average", q:"What does \"CNN\" stand for in deep learning?", opts:["Central Node Network","Convolutional Neural Network","Combined Node Notation","Cyclic Neural Node"], correct:1 },
+    { tag:"Core Concepts", diff:"average", q:"When an AI system reflects unfair patterns learned from its training data, this is called:", opts:["Bias","Latency","Compression","Encryption"], correct:0 },
+    { tag:"Architecture", diff:"hard", q:"The architecture behind GPT-style models is called the:", opts:["Perceptron","Transformer","Autoencoder","Markov Chain"], correct:1 },
+    { tag:"History", diff:"hard", q:"Who is widely credited as coining the term \"Artificial Intelligence\"?", opts:["Alan Turing","Geoffrey Hinton","John McCarthy","Marvin Minsky"], correct:2 },
+    { tag:"Architecture", diff:"hard", q:"What does \"GAN\" stand for?", opts:["Global Aggregation Network","Generative Adversarial Network","Gradient Assisted Node","General AI Node"], correct:1 },
+    { tag:"History", diff:"hard", q:"The Turing Test was designed to evaluate:", opts:["A computer's processing speed","Whether a machine's behavior is indistinguishable from a human's","How much data a model can store","A network's bandwidth"], correct:1 },
+  ];
+  const POINTS_PER_Q = 5;
+  const QUIZ_SECONDS = 20 * 60; // 20 minute time limit
+
+  // ---------------- STATE ----------------
+  let userName = "";
+  let current = 0;
+  let score = 0;
+  let correctCount = 0;
+  let wrongCount = 0;
+  let locked = false;
+  let answersLog = [];
+  let timerInterval = null;
+  let timeRemaining = QUIZ_SECONDS;
+  let cheatDetected = false;
+  let cheatReasons = [];
+  let quizActive = false;
+  let hostUnlocked = false;
+
+  // ---------------- DOM ----------------
+  const $ = id => document.getElementById(id);
+  const screens = {
+    start: $('screen-start'),
+    quiz: $('screen-quiz'),
+    result: $('screen-result'),
+    leaderboard: $('screen-leaderboard'),
+  };
+  function show(name){
+    Object.values(screens).forEach(s => s.classList.add('hidden'));
+    screens[name].classList.remove('hidden');
+    window.scrollTo({top:0, behavior:'smooth'});
+  }
+
+  // ---------------- AMBIENT WIRES BG ----------------
+  function initWires(){
+    const svg = document.getElementById('wires');
+    const w = window.innerWidth, h = window.innerHeight;
+    svg.setAttribute('viewBox', `0 0 ${w} ${h}`);
+    const pointCount = 6;
+    let pts = [];
+    for(let i=0;i<pointCount;i++){
+      pts.push([Math.random()*w, Math.random()*h]);
+    }
+    for(let i=0;i<pointCount-1;i++){
+      const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+      const [x1,y1] = pts[i], [x2,y2] = pts[i+1];
+      const mx = (x1+x2)/2 + (Math.random()-0.5)*200;
+      const my = (y1+y2)/2 + (Math.random()-0.5)*200;
+      path.setAttribute('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`);
+      svg.appendChild(path);
+    }
+    pts.forEach(([x,y])=>{
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',2.5);
+      svg.appendChild(c);
+    });
+  }
+  initWires();
+
+  // orbit satellites
+  (function initOrbit(){
+    const g = document.getElementById('satellites');
+    const n = 5;
+    for(let i=0;i<n;i++){
+      const angle = (i/n) * Math.PI * 2;
+      const r = i % 2 === 0 ? 95 : 65;
+      const cx = 110 + r*Math.cos(angle);
+      const cy = 110 + r*Math.sin(angle);
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('class','satellite');
+      c.setAttribute('cx', cx); c.setAttribute('cy', cy); c.setAttribute('r', 5);
+      c.style.animation = `pulse-dot ${1.4 + i*0.3}s infinite`;
+      g.appendChild(c);
+    }
+  })();
+
+  // ---------------- STORAGE HELPERS (Firebase Firestore) ----------------
+  async function saveScoreToLeaderboard(name, pts){
+    try{
+      await addDoc(scoresCol, {
+        name: name,
+        score: pts,
+        ts: Date.now(),
+        createdAt: serverTimestamp()
+      });
+      return true;
+    }catch(e){
+      console.error('Could not save score', e);
+      return false;
+    }
+  }
+
+  async function loadLeaderboard(){
+    const listEl = $('lbList');
+    listEl.innerHTML = '<div class="lb-loading">Loading rankings…</div>';
+    try{
+      const q = query(scoresCol, orderBy('score','desc'), orderBy('ts','asc'), limit(50));
+      const snap = await getDocs(q);
+      const entries = [];
+      snap.forEach(doc => entries.push(doc.data()));
+      renderLeaderboard(entries);
+    }catch(e){
+      console.error(e);
+      listEl.innerHTML = '<div class="lb-empty">Rankings could not be loaded right now. Check your Firebase config &amp; Firestore rules.</div>';
+    }
+  }
+
+  function renderLeaderboard(entries){
+    const listEl = $('lbList');
+    if(entries.length === 0){
+      listEl.innerHTML = '<div class="lb-empty">No scores yet — be the first to finish the quiz.</div>';
+      return;
+    }
+    listEl.innerHTML = '';
+    entries.forEach((e, i) => {
+      const row = document.createElement('div');
+      const rankNum = i+1;
+      const isMe = e.name === userName && e.score === score && Math.abs(Date.now()-e.ts) < 60000;
+      row.className = 'lb-row' + (isMe ? ' me' : '');
+      row.style.animationDelay = (i*0.03)+'s';
+      const rankClass = rankNum===1?'r1':rankNum===2?'r2':rankNum===3?'r3':'';
+      const date = new Date(e.ts);
+      const dateStr = date.toLocaleDateString(undefined,{month:'short', day:'numeric'});
+      row.innerHTML = `
+        <div class="rank ${rankClass}">${rankNum}</div>
+        <div class="lb-name">${escapeHtml(e.name || 'Anonymous')}<div class="lb-date">${dateStr}</div></div>
+        <div class="lb-score">${e.score} pts</div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  function escapeHtml(str){
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  // ---------------- TRACK (progress) ----------------
+  function buildTrack(){
+    const track = $('track');
+    track.innerHTML = '';
+    for(let i=0;i<QUESTIONS.length;i++){
+      const node = document.createElement('div');
+      node.className = 'track-node';
+      node.id = 'node-'+i;
+      track.appendChild(node);
+      if(i < QUESTIONS.length-1){
+        const line = document.createElement('div');
+        line.className = 'track-line';
+        line.id = 'line-'+i;
+        track.appendChild(line);
+      }
+    }
+  }
+  function updateTrack(){
+    for(let i=0;i<QUESTIONS.length;i++){
+      const node = $('node-'+i);
+      node.classList.remove('done','wrong','current');
+      if(i < current){
+        node.classList.add(answersLog[i] === 'correct' ? 'done' : 'wrong');
+      } else if(i === current){
+        node.classList.add('current');
+      }
+      if(i < QUESTIONS.length-1){
+        const line = $('line-'+i);
+        line.classList.remove('done','wrong');
+        if(i < current) line.classList.add(answersLog[i] === 'correct' ? 'done' : 'wrong');
+      }
+    }
+  }
+
+  // ---------------- ANTI-CHEAT ----------------
+  const CHEAT_LABELS = {
+    'copy': 'Copy attempt on question or option text',
+    'right-click': 'Right-click / context menu opened',
+    'tab-switch': 'Switched tabs or minimized the window',
+    'devtools-shortcut': 'Developer tools shortcut used',
+  };
+
+  function isQuizActive(){
+    return !screens.quiz.classList.contains('hidden');
+  }
+
+  function flagCheat(reason){
+    if(!isQuizActive()) return;
+    if(!cheatReasons.includes(reason)) cheatReasons.push(reason);
+    cheatDetected = true;
+    const banner = $('cheatBanner');
+    banner.classList.remove('hidden');
+    $('cheatBannerText').textContent = 'Suspicious activity detected (' + cheatReasons.length + ') — this attempt will be voided.';
+  }
+
+  document.addEventListener('copy', e => {
+    if(isQuizActive()){ e.preventDefault(); flagCheat('copy'); }
+  });
+  document.addEventListener('contextmenu', e => {
+    if(isQuizActive()){ e.preventDefault(); flagCheat('right-click'); }
+  });
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden && isQuizActive()){ flagCheat('tab-switch'); }
+  });
+  window.addEventListener('blur', () => {
+    if(isQuizActive()){ flagCheat('tab-switch'); }
+  });
+  document.addEventListener('keydown', e => {
+    if(!isQuizActive()) return;
+    const blocked =
+      e.key === 'F12' ||
+      (e.ctrlKey && e.shiftKey && ['I','J','C','i','j','c'].includes(e.key)) ||
+      (e.ctrlKey && (e.key === 'u' || e.key === 'U')) ||
+      (e.metaKey && e.altKey && ['I','i'].includes(e.key));
+    if(blocked){ e.preventDefault(); flagCheat('devtools-shortcut'); }
+  });
+
+  // ---------------- TIMER ----------------
+  function startTimer(){
+    clearInterval(timerInterval);
+    timeRemaining = QUIZ_SECONDS;
+    updateTimerDisplay();
+    timerInterval = setInterval(() => {
+      timeRemaining--;
+      updateTimerDisplay();
+      if(timeRemaining <= 0){
+        clearInterval(timerInterval);
+        handleTimeUp();
+      }
+    }, 1000);
+  }
+  function updateTimerDisplay(){
+    const m = Math.floor(timeRemaining/60);
+    const s = timeRemaining%60;
+    $('timerText').textContent = String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+    $('timerPill').classList.toggle('low', timeRemaining <= 60);
+  }
+  function handleTimeUp(){
+    if(locked) return; // already mid-transition, let it finish naturally
+    locked = true;
+    // remaining unanswered questions count as wrong
+    for(let i=current; i<QUESTIONS.length; i++){
+      if(answersLog[i] === undefined){ answersLog[i] = 'wrong'; wrongCount++; }
+    }
+    finishQuiz();
+  }
+
+  // ---------------- QUIZ LOGIC ----------------
+  function startQuiz(){
+    if(!quizActive) return; // locked until the host activates it
+    userName = $('nameInput').value.trim() || 'Anonymous';
+    current = 0; score = 0; correctCount = 0; wrongCount = 0; answersLog = [];
+    cheatDetected = false; cheatReasons = [];
+    $('cheatBanner').classList.add('hidden');
+    $('integrityBox').classList.add('hidden');
+    buildTrack();
+    show('quiz');
+    renderQuestion();
+    startTimer();
+  }
+
+  function renderQuestion(){
+    locked = false;
+    const item = QUESTIONS[current];
+    $('qNumNow').textContent = current+1;
+    $('qTag').textContent = item.tag.toUpperCase();
+    $('qDiff').textContent = item.diff.toUpperCase();
+    $('qDiff').className = 'diff-badge ' + item.diff;
+    $('qText').textContent = item.q;
+    $('livePoints').textContent = score + ' PTS';
+    $('feedback').textContent = '';
+    $('feedback').className = 'feedback';
+    updateTrack();
+
+    const wrap = $('optionsWrap');
+    wrap.innerHTML = '';
+    const letters = ['A','B','C','D'];
+    item.opts.forEach((optText, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'opt';
+      btn.innerHTML = `<span class="letter">${letters[idx]}</span><span>${escapeHtml(optText)}</span>`;
+      btn.addEventListener('click', () => selectOption(idx, btn));
+      wrap.appendChild(btn);
+    });
+  }
+
+  function selectOption(idx, btnEl){
+    if(locked) return;
+    locked = true;
+    const item = QUESTIONS[current];
+    const allOpts = Array.from(document.querySelectorAll('#optionsWrap .opt'));
+    allOpts.forEach(o => o.classList.add('locked'));
+
+    const isCorrect = idx === item.correct;
+    if(isCorrect){
+      btnEl.classList.add('correct');
+      score += POINTS_PER_Q;
+      correctCount++;
+      answersLog[current] = 'correct';
+      $('feedback').textContent = '✓ Correct — +' + POINTS_PER_Q + ' points';
+      $('feedback').className = 'feedback show-correct';
+    } else {
+      btnEl.classList.add('wrong');
+      allOpts[item.correct].classList.add('correct');
+      wrongCount++;
+      answersLog[current] = 'wrong';
+      $('feedback').textContent = '✗ Not quite — correct answer highlighted';
+      $('feedback').className = 'feedback show-wrong';
+    }
+    allOpts.forEach((o,i) => { if(i!==idx && i!==item.correct) o.classList.add('dim'); });
+    $('livePoints').textContent = score + ' PTS';
+    updateTrack();
+
+    setTimeout(() => {
+      current++;
+      if(current >= QUESTIONS.length){
+        finishQuiz();
+      } else {
+        renderQuestion();
+      }
+    }, 1100);
+  }
+
+  async function finishQuiz(){
+    clearInterval(timerInterval);
+
+    if(cheatDetected){
+      // void the attempt: every answer counts as wrong, score reset to 0
+      score = 0;
+      wrongCount = QUESTIONS.length;
+      correctCount = 0;
+    }
+
+    show('result');
+    animateScore();
+    $('statCorrect').textContent = correctCount;
+    $('statWrong').textContent = wrongCount;
+    const acc = Math.round((correctCount/QUESTIONS.length)*100);
+    $('statAccuracy').textContent = acc + '%';
+
+    if(cheatDetected){
+      $('gradeText').textContent = 'Attempt Voided';
+      $('gradeSub').textContent = 'Integrity check failed for this attempt.';
+      const box = $('integrityBox');
+      box.classList.remove('hidden');
+      const list = $('integrityReasons');
+      list.innerHTML = '';
+      cheatReasons.forEach(r => {
+        const li = document.createElement('li');
+        li.textContent = CHEAT_LABELS[r] || r;
+        list.appendChild(li);
+      });
+      return; // do not save voided attempts to the leaderboard
+    }
+
+    let grade, sub;
+    if(score >= 90){ grade='Neural Virtuoso'; sub='Elite-level AI knowledge — you clearly live in this space.'; }
+    else if(score >= 70){ grade='Signal Strong'; sub='Solid grasp of AI fundamentals with a few gaps to close.'; }
+    else if(score >= 45){ grade='Learning Rate: Moderate'; sub='You know the basics — a bit more study and you\'ll level up fast.'; }
+    else { grade='Untrained Model'; sub='Just getting started — revisit the fundamentals and try again.'; }
+    $('gradeText').textContent = grade;
+    $('gradeSub').textContent = sub;
+
+    await saveScoreToLeaderboard(userName, score);
+  }
+
+  function animateScore(){
+    const el = $('finalScore');
+    let start = 0;
+    const target = score;
+    const duration = 900;
+    const startTime = performance.now();
+    function step(now){
+      const p = Math.min(1, (now-startTime)/duration);
+      const eased = 1 - Math.pow(1-p, 3);
+      el.textContent = Math.round(eased * target);
+      if(p < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+
+  // ---------------- HOST ACTIVATION ----------------
+  function updateStartUI(){
+    const btn = $('startBtn');
+    const box = $('waitingBox');
+    const txt = $('waitingText');
+    if(quizActive){
+      btn.disabled = false;
+      box.classList.add('live');
+      txt.textContent = 'The host has activated the quiz — you\'re good to go.';
+    } else {
+      btn.disabled = true;
+      box.classList.remove('live');
+      txt.textContent = 'Waiting for the host to activate the quiz…';
+    }
+    const hostStatus = $('hostStatus');
+    if(hostStatus){
+      hostStatus.textContent = quizActive ? 'Quiz is ACTIVE' : 'Quiz is INACTIVE';
+      hostStatus.className = 'status ' + (quizActive ? 'on' : 'off');
+      $('hostToggleBtn').textContent = quizActive ? 'Deactivate quiz' : 'Activate quiz';
+    }
+  }
+
+  // Live-sync activation state across every visitor.
+  onSnapshot(settingsDocRef, snap => {
+    quizActive = snap.exists() ? !!snap.data().active : false;
+    updateStartUI();
+  }, err => {
+    console.error('Could not read activation status', err);
+    quizActive = false;
+    updateStartUI();
+  });
+
+  async function setQuizActive(value){
+    try{
+      await setDoc(settingsDocRef, { active: value, updatedAt: serverTimestamp() }, { merge: true });
+    }catch(e){
+      console.error('Could not update activation status', e);
+      alert('Could not update activation status — check your Firestore rules.');
+    }
+  }
+
+  // Reveal the host panel only when ?host=1 is in the URL.
+  if(new URLSearchParams(window.location.search).get('host') === '1'){
+    $('hostPanel').classList.remove('hidden');
+  }
+  $('hostUnlockBtn').addEventListener('click', () => {
+    if($('hostPasscode').value === HOST_PASSCODE){
+      hostUnlocked = true;
+      $('hostLocked').classList.add('hidden');
+      $('hostUnlocked').classList.remove('hidden');
+      updateStartUI();
+    } else {
+      alert('Incorrect passcode.');
+    }
+  });
+  $('hostToggleBtn').addEventListener('click', () => {
+    setQuizActive(!quizActive);
+  });
+
+  // ---------------- EVENTS ----------------
+  $('startBtn').addEventListener('click', startQuiz);
+  $('nameInput').addEventListener('keydown', e => { if(e.key === 'Enter') startQuiz(); });
+
+  $('viewLbFromStart').addEventListener('click', () => { show('leaderboard'); loadLeaderboard(); });
+  $('viewLbFromResult').addEventListener('click', () => { show('leaderboard'); loadLeaderboard(); });
+  $('retakeFromLb').addEventListener('click', () => show('start'));
+  $('tabHome').addEventListener('click', () => show('start'));
+  $('tabLb').addEventListener('click', () => { show('leaderboard'); loadLeaderboard(); });
+  $('refreshLb').addEventListener('click', loadLeaderboard);
+  $('playAgainBtn').addEventListener('click', () => { $('nameInput').value = userName; show('start'); });
+
+  show('start');
+})();
+</script>
+</body>
+</html>
