@@ -96,6 +96,27 @@
   }
   input#nameInput::placeholder{ color:var(--text-dim); }
   input#nameInput:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(124,92,255,0.15); }
+  input#phoneInput{
+    width:100%; max-width:360px;
+    background:var(--surface);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:'JetBrains Mono', monospace;
+    font-size:15px;
+    padding:15px 18px;
+    border-radius:12px;
+    outline:none;
+    transition:border-color .2s, box-shadow .2s;
+    text-align:center;
+  }
+  input#phoneInput::placeholder{ color:var(--text-dim); font-family:'Inter', sans-serif; }
+  input#phoneInput:focus{ border-color:var(--accent); box-shadow:0 0 0 4px rgba(124,92,255,0.15); }
+  .phone-msg{
+    font-family:'JetBrains Mono', monospace; font-size:12.5px; min-height:18px;
+    color:var(--text-dim);
+  }
+  .phone-msg.err{ color:var(--danger); }
+  .phone-msg.ok{ color:var(--success); }
 
   .btn{
     font-family:'Space Grotesk', sans-serif;
@@ -340,6 +361,8 @@
 
     <div class="start-form">
       <input id="nameInput" type="text" placeholder="Enter your name to begin" maxlength="24" autocomplete="off" />
+      <input id="phoneInput" type="tel" placeholder="Enter your phone number" maxlength="15" autocomplete="off" />
+      <div class="phone-msg" id="phoneMsg"></div>
       <button class="btn btn-primary" id="startBtn" disabled>Start the quiz →</button>
       <div class="waiting-box" id="waitingBox">
         <p><span class="wdot"></span><span id="waitingText">Checking with the host…</span></p>
@@ -454,15 +477,17 @@
     getFirestore, collection, addDoc, getDocs, query, orderBy, limit, serverTimestamp,
     doc, setDoc, getDoc, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-const firebaseConfig = {
+
+  const firebaseConfig = {
   apiKey: "AIzaSyB2HQzIAzrrLuTMtnRtlKCuyKC79RRDd1c",
   authDomain: "ai-powerd-ccb9e.firebaseapp.com",
   projectId: "ai-powerd-ccb9e",
   storageBucket: "ai-powerd-ccb9e.firebasestorage.app",
   messagingSenderId: "211603785054",
-  appId: "1:211603785054:web:2a1d5172022edfc944bbcf",
-  measurementId: "G-SNZL79QH3K"
+  appId: "1:211603785054:web:171588bb6cd69a2a44bbcf",
+  measurementId: "G-XZ626FJ58E"
 };
+
 
   // Change this to your own passcode — anyone who enters it in the
   // Host Controls panel (opened with ?host=1 in the URL) can activate
@@ -473,6 +498,7 @@ const firebaseConfig = {
   const db = getFirestore(firebaseApp);
   const scoresCol = collection(db, "scores");
   const settingsDocRef = doc(db, "settings", "quiz");
+  const participantsCol = collection(db, "participants");
   // ============================================================
 
 (function(){
@@ -504,6 +530,7 @@ const firebaseConfig = {
 
   // ---------------- STATE ----------------
   let userName = "";
+  let userPhone = "";
   let current = 0;
   let score = 0;
   let correctCount = 0;
@@ -575,6 +602,20 @@ const firebaseConfig = {
   })();
 
   // ---------------- STORAGE HELPERS (Firebase Firestore) ----------------
+  async function recordParticipant(phone, name, pts, wasVoided){
+    if(!phone) return;
+    try{
+      await setDoc(doc(participantsCol, phone), {
+        name: name,
+        score: pts,
+        voided: !!wasVoided,
+        completedAt: serverTimestamp()
+      });
+    }catch(e){
+      console.error('Could not record participant completion', e);
+    }
+  }
+
   async function saveScoreToLeaderboard(name, pts){
     try{
       await addDoc(scoresCol, {
@@ -744,9 +785,57 @@ const firebaseConfig = {
   }
 
   // ---------------- QUIZ LOGIC ----------------
-  function startQuiz(){
+  function sanitizePhone(raw){
+    return raw.replace(/\D/g, ''); // digits only
+  }
+
+  async function attemptStart(){
     if(!quizActive) return; // locked until the host activates it
-    userName = $('nameInput').value.trim() || 'Anonymous';
+
+    const nameVal = $('nameInput').value.trim();
+    const phoneRaw = $('phoneInput').value.trim();
+    const phone = sanitizePhone(phoneRaw);
+    const msg = $('phoneMsg');
+
+    if(!nameVal){
+      msg.textContent = 'Please enter your name.';
+      msg.className = 'phone-msg err';
+      return;
+    }
+    if(phone.length < 7){
+      msg.textContent = 'Please enter a valid phone number.';
+      msg.className = 'phone-msg err';
+      return;
+    }
+
+    const btn = $('startBtn');
+    btn.disabled = true;
+    msg.textContent = 'Checking your number…';
+    msg.className = 'phone-msg';
+
+    try{
+      const existing = await getDoc(doc(participantsCol, phone));
+      if(existing.exists()){
+        msg.textContent = 'This phone number has already completed the quiz.';
+        msg.className = 'phone-msg err';
+        btn.disabled = !quizActive ? true : false;
+        return;
+      }
+    }catch(e){
+      console.error('Could not verify phone number', e);
+      msg.textContent = 'Could not verify your number — please try again.';
+      msg.className = 'phone-msg err';
+      btn.disabled = false;
+      return;
+    }
+
+    msg.textContent = '';
+    userName = nameVal;
+    userPhone = phone;
+    startQuiz();
+  }
+
+  function startQuiz(){
     current = 0; score = 0; correctCount = 0; wrongCount = 0; answersLog = [];
     cheatDetected = false; cheatReasons = [];
     $('cheatBanner').classList.add('hidden');
@@ -828,6 +917,8 @@ const firebaseConfig = {
       wrongCount = QUESTIONS.length;
       correctCount = 0;
     }
+
+    await recordParticipant(userPhone, userName, score, cheatDetected);
 
     show('result');
     animateScore();
@@ -937,8 +1028,9 @@ const firebaseConfig = {
   });
 
   // ---------------- EVENTS ----------------
-  $('startBtn').addEventListener('click', startQuiz);
-  $('nameInput').addEventListener('keydown', e => { if(e.key === 'Enter') startQuiz(); });
+  $('startBtn').addEventListener('click', attemptStart);
+  $('nameInput').addEventListener('keydown', e => { if(e.key === 'Enter') attemptStart(); });
+  $('phoneInput').addEventListener('keydown', e => { if(e.key === 'Enter') attemptStart(); });
 
   $('viewLbFromStart').addEventListener('click', () => { show('leaderboard'); loadLeaderboard(); });
   $('viewLbFromResult').addEventListener('click', () => { show('leaderboard'); loadLeaderboard(); });
