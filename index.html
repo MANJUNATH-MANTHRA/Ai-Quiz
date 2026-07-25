@@ -361,7 +361,7 @@
 
     <div class="start-form">
       <input id="nameInput" type="text" placeholder="Enter your name to begin" maxlength="24" autocomplete="off" />
-      <input id="phoneInput" type="tel" placeholder="Enter your phone number" maxlength="15" autocomplete="off" />
+      <input id="phoneInput" type="tel" placeholder="e.g. +91 98765 43210 (include country code)" maxlength="18" autocomplete="off" />
       <div class="phone-msg" id="phoneMsg"></div>
       <button class="btn btn-primary" id="startBtn" disabled>Start the quiz →</button>
       <div class="waiting-box" id="waitingBox">
@@ -478,6 +478,7 @@
     doc, setDoc, getDoc, onSnapshot
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
+  
   const firebaseConfig = {
   apiKey: "AIzaSyB2HQzIAzrrLuTMtnRtlKCuyKC79RRDd1c",
   authDomain: "ai-powerd-ccb9e.firebaseapp.com",
@@ -786,7 +787,18 @@
 
   // ---------------- QUIZ LOGIC ----------------
   function sanitizePhone(raw){
-    return raw.replace(/\D/g, ''); // digits only
+    // Keep a leading + (country code marker), strip everything else non-digit.
+    const trimmed = raw.trim();
+    const hasPlus = trimmed.startsWith('+');
+    const digits = trimmed.replace(/\D/g, '');
+    return (hasPlus ? '+' : '') + digits;
+  }
+
+  function isValidPhoneWithCountryCode(phone){
+    // Must start with + then 8-15 digits total (E.164-style).
+    // This is what actually forces a country code to be present —
+    // a bare local number like "9876543210" will fail this check.
+    return /^\+[1-9]\d{7,14}$/.test(phone);
   }
 
   async function attemptStart(){
@@ -802,8 +814,8 @@
       msg.className = 'phone-msg err';
       return;
     }
-    if(phone.length < 7){
-      msg.textContent = 'Please enter a valid phone number.';
+    if(!isValidPhoneWithCountryCode(phone)){
+      msg.textContent = 'Please include your country code, e.g. +91 98765 43210.';
       msg.className = 'phone-msg err';
       return;
     }
