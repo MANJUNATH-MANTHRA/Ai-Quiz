@@ -636,7 +636,7 @@
     const listEl = $('lbList');
     listEl.innerHTML = '<div class="lb-loading">Loading rankings…</div>';
     try{
-      const q = query(scoresCol, orderBy('score','desc'), orderBy('ts','asc'), limit(50));
+      const q = query(scoresCol, orderBy('score','desc'), orderBy('ts','asc'));
       const snap = await getDocs(q);
       const entries = [];
       snap.forEach(doc => entries.push(doc.data()));
